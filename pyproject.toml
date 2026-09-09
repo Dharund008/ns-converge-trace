@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ns-converge-trace"
+version = "1.0.0"
+description = "Unified NS propagation / DNS cutover convergence checker across registry, authoritative, and public resolver layers"
+readme = "README.md"
+requires-python = ">=3.7"
+license = { text = "MIT" }
+authors = [
+    { name = "Dharun" }
+]
+keywords = ["dns", "ns-records", "cutover", "propagation", "cloudflare", "networking"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+    "Topic :: Internet :: Name Service (DNS)",
+    "Intended Audience :: System Administrators",
+]
+
+# No third-party runtime dependencies — stdlib only, with an optional
+# preference for the system `dig` binary if it's on PATH (auto-detected).
+dependencies = []
+
+[project.scripts]
+ns-converge-trace = "ns_converge_trace.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["ns_converge_trace*"]

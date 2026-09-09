@@ -1,0 +1,25 @@
+# Virtual environments
+.nsconverge/
+nsconverge/
+.venv/
+venv/
+env/
+
+# Python build / packaging artifacts
+*.egg-info/
+dist/
+build/
+*.egg
+*.whl
+
+# Byte-compiled / cached
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ns-converge-trace log files (generated with --log)
+ns-converge-trace-*.log
+
+# OS junk
+.DS_Store
+Thumbs.db
