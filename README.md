@@ -18,15 +18,16 @@ propagation has fully converged.
 Every layer's answer is compared against the registry baseline. If all
 layers agree, the domain is **CONVERGED**. If any layer disagrees, it's
 **PROPAGATING** (still catching up) — and the table shows exactly which
-layer/resolver is behind, including the **TTL** of cached records so you
-know roughly how long until convergence.
+layer/resolver is behind.
 
 No API keys. No config files. No provider-specific hardcoding.
 
-## Exit codes
+**Additional capabilities:**
+- **TTL reporting** — every row shows the minimum TTL of cached NS records, so you know roughly when a stale answer will expire
+- **Parallel resolver queries** — public resolvers are queried concurrently, so checking 5–10 resolvers takes the time of the slowest, not the sum
+- **Watch mode diff** — in `--watch` mode, shows what changed since the previous poll instead of requiring you to re-read the full table
 
-`ns-converge-trace` sets a meaningful exit code so it composes with scripts
-and CI pipelines:
+## Exit codes
 
 | Code | Meaning |
 |---|---|
@@ -37,42 +38,11 @@ and CI pipelines:
 When checking multiple domains, the exit code reflects the **worst** status
 across all of them (UNKNOWN > PROPAGATING > CONVERGED).
 
-### Examples
-
-```bash
-# Gate a deploy on full convergence
-ns-converge-trace example.com && kubectl rollout restart deployment/app
-
-# Branch on status in a script
-ns-converge-trace example.com
-case $? in
-  0) echo "Converged — safe to proceed" ;;
-  1) echo "Still propagating — waiting" ;;
-  2) echo "Couldn't establish baseline — investigate" ;;
-esac
-
-# CI pipeline step (non-zero fails the step)
-- name: Verify NS cutover
-  run: ns-converge-trace example.com
-```
-
 ## DNS engine
 
-`ns-converge-trace` auto-detects and prefers the system `dig` binary (from
-`bind-utils` / `dnsutils`) if it's available on your `PATH` — `dig` already
-handles TCP-retry-on-truncation, EDNS0, and years of real-world edge cases.
-
-If `dig` is **not** installed (e.g. plain Windows, minimal containers), it
-automatically falls back to a **built-in pure-Python DNS client** (stdlib
-only — `socket` + `struct`, zero third-party dependencies) that implements:
-
-- EDNS0 (requests a larger UDP payload to avoid truncation)
-- Automatic TCP fallback when a response is truncated (TC flag)
-- Basic IDN/punycode label encoding for non-ASCII domains
-
-Either way, **no external Python packages are required** — this is a fully
-standalone tool. Force a specific engine with `--engine dig` or `--engine python`
-if needed (e.g. for testing).
+Prefers the system `dig` binary if available on PATH; falls back to a
+built-in pure-Python DNS client (stdlib only, zero dependencies). Force
+with `--engine dig` or `--engine python`.
 
 ## Installation
 
@@ -156,7 +126,7 @@ ns-converge-trace --version
 | `--resolvers IP:Name ...` | Custom resolver list, overrides `--resolver-set` |
 | `--resolver-set {core,full}` | `core` (5 resolvers, default) or `full` (10 resolvers) |
 | `--engine {auto,dig,python}` | DNS engine selection (default: `auto`) |
-| `--no-color` | Disable ANSI colors in table output |
+| `--no-color` | Disable ANSI colors in table output (also respects `NO_COLOR` env var) |
 | `--version` | Print version and exit |
 
 > **`--watch` with multiple domains:** Domains are watched **sequentially** —
@@ -165,34 +135,30 @@ ns-converge-trace --version
 > multiple domains in parallel, run separate `ns-converge-trace --watch`
 > instances in different terminal tabs or with `&` backgrounding.
 
-### Color behavior
+## Known limitations
 
-ANSI colors are enabled automatically when stdout is a terminal. They are
-disabled when:
-- `--no-color` is passed, or
-- The `NO_COLOR` environment variable is set (any value) — per the
-  [no-color.org](https://no-color.org/) convention, or
-- Output is piped or redirected to a file.
+- **TLD extraction is naive** (last label only). It does not correctly
+  handle two-part public suffixes like `.co.uk` or `.com.au` — it would
+  treat `uk`/`au` as the TLD and query the wrong registry. Fine for
+  `.com`, `.io`, `.net`, and other single-label TLDs.
+- **IPv6-only authoritative nameservers are not resolved.** Virtually all
+  major DNS providers (Cloudflare, Route53, etc.) publish IPv4 glue
+  records for their NS hostnames, so this is rare in practice. If
+  encountered, the tool reports a clear resolution error rather than
+  silently producing a wrong answer.
+- Resolver reachability depends on your network. Some resolvers may be
+  blocked or unreachable from certain networks (corporate firewalls,
+  restricted sandboxes, etc.) — this will show as an `ERROR` row rather
+  than a false convergence result.
+- **`--watch` with multiple domains is sequential**, not parallel. See the
+  note under CLI flags above.
 
-## Features
+## Requirements
 
-### TTL reporting
-
-Every row in the output table shows the **minimum TTL** (time-to-live) of
-the NS records returned by that source. During a cutover, this tells you
-roughly how long until a stale-cached answer expires — the most common
-follow-up question after "has it converged?" is "when will it converge?"
-
-### Parallel resolver queries
-
-Public resolver queries run **concurrently** (threaded), so checking 5–10
-resolvers takes roughly the time of the slowest one, not the sum of all.
-
-### Watch mode diff
-
-In `--watch` mode, after the first poll, the tool shows a **diff** of what
-changed since the previous attempt — so you see `Google: DIVERGED → PASS`
-instead of having to re-read the full table each time.
+- Python 3.7+ (stdlib only, no third-party runtime dependencies)
+- Optional: system `dig` binary (`bind-utils` on RHEL/CentOS, `dnsutils` on
+  Debian/Ubuntu) — used automatically if present, otherwise the built-in
+  Python DNS engine is used instead
 
 ## Resolver sets
 
@@ -221,31 +187,6 @@ Use `--resolvers` to fully override either set with your own list, e.g.:
 ```bash
 ns-converge-trace example.com --resolvers 1.1.1.1:Cloudflare 8.8.8.8:Google
 ```
-
-## Known limitations
-
-- **TLD extraction is naive** (last label only). It does not correctly
-  handle two-part public suffixes like `.co.uk` or `.com.au` — it would
-  treat `uk`/`au` as the TLD and query the wrong registry. Fine for
-  `.com`, `.io`, `.net`, and other single-label TLDs.
-- **IPv6-only authoritative nameservers are not resolved.** Virtually all
-  major DNS providers (Cloudflare, Route53, etc.) publish IPv4 glue
-  records for their NS hostnames, so this is rare in practice. If
-  encountered, the tool reports a clear resolution error rather than
-  silently producing a wrong answer.
-- Resolver reachability depends on your network. Some resolvers may be
-  blocked or unreachable from certain networks (corporate firewalls,
-  restricted sandboxes, etc.) — this will show as an `ERROR` row rather
-  than a false convergence result.
-- **`--watch` with multiple domains is sequential**, not parallel. See the
-  note under CLI flags above.
-
-## Requirements
-
-- Python 3.7+ (stdlib only, no third-party runtime dependencies)
-- Optional: system `dig` binary (`bind-utils` on RHEL/CentOS, `dnsutils` on
-  Debian/Ubuntu) — used automatically if present, otherwise the built-in
-  Python DNS engine is used instead
 
 ## License
 

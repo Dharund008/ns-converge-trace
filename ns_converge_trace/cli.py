@@ -54,6 +54,8 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
+from ns_converge_trace import __version__
+
 # --------------------------------------------------------------------------
 # Resolver sets
 # --------------------------------------------------------------------------
@@ -741,7 +743,7 @@ def main():
     parser.add_argument("--engine", choices=["auto", "dig", "python"], default="auto",
                          help="DNS engine: auto (prefer dig, fallback to pure-Python), or force one explicitly")
     parser.add_argument("--no-color", action="store_true", help="Disable ANSI colors in table output")
-    parser.add_argument("--version", action="version", version="ns-converge-trace 1.0.0")
+    parser.add_argument("--version", action="version", version=f"ns-converge-trace {__version__}")
 
     args = parser.parse_args()
 

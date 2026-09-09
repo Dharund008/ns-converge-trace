@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ns-converge-trace"
-version = "1.0.0"
+dynamic = ["version"]
 description = "Unified NS propagation / DNS cutover convergence checker across registry, authoritative, and public resolver layers"
 readme = "README.md"
 requires-python = ">=3.7"
@@ -26,6 +26,9 @@ dependencies = []
 
 [project.scripts]
 ns-converge-trace = "ns_converge_trace.cli:main"
+
+[tool.setuptools.dynamic]
+version = {attr = "ns_converge_trace.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["ns_converge_trace*"]
