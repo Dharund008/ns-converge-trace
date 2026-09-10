@@ -46,23 +46,22 @@ with `--engine dig` or `--engine python`.
 
 ## Installation
 
+From PyPI:
+
+```bash
+pip install ns-converge-trace #explicit tool usage coverage 
+```
+
+From source (cloned repo):
+
 ```bash
 pip install .
 ```
-
-This installs the `ns-converge-trace` command onto your PATH.
 
 For local development (editable install, so code changes take effect immediately):
 
 ```bash
 pip install -e .
-```
-
-No installation is required if `dig` is present — you can also run the
-module directly without installing:
-
-```bash
-python3 -m ns_converge_trace.cli example.com
 ```
 
 ## Usage

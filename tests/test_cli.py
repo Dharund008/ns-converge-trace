@@ -185,11 +185,12 @@ example.com.		86400	IN	NS	ns2.example.com.
     @patch("ns_converge_trace.cli._get_dig_path", return_value="/usr/bin/dig")
     @patch("subprocess.run")
     def test_empty_output(self, mock_run, mock_dig):
+        """dig exits 0 with empty stdout (e.g. timeout) → should report error, not silent success."""
         mock_run.return_value = MagicMock(
             returncode=0, stdout="", stderr="",
         )
         values, err, min_ttl = _dig_query("8.8.8.8", "example.com", "NS")
-        self.assertIsNone(err)
+        self.assertEqual(err, "no records in response")
         self.assertEqual(values, [])
         self.assertIsNone(min_ttl)
 

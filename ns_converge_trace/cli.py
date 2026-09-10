@@ -145,11 +145,11 @@ def _dig_query(server, domain, rtype):
     cmd = [
         dig_path, rtype, domain, f"@{server}",
         "+noall", "+answer", "+authority",
-        f"+time={DNS_TIMEOUT}", "+tries=1",
+        f"+time={DNS_TIMEOUT}", "+tries=2",
     ]
     try:
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=DNS_TIMEOUT + 3
+            cmd, capture_output=True, text=True, timeout=(DNS_TIMEOUT * 2) + 3
         )
     except subprocess.TimeoutExpired:
         return [], "timeout", None
@@ -179,6 +179,8 @@ def _dig_query(server, domain, rtype):
         except (ValueError, IndexError):
             pass
 
+    if not values:
+        return [], "no records in response", None
     return sorted(set(values)), None, min_ttl
 
 
@@ -350,12 +352,18 @@ def _query_tcp(server_ip, packet, timeout):
 def _python_query(server_ip, domain, qtype, timeout=DNS_TIMEOUT):
     """
     Pure-Python DNS query with EDNS0 + automatic TCP fallback on truncation.
+    Retries once on UDP timeout (transient packet loss is common on some
+    resolvers).
     Returns (results_list, error_or_None, min_ttl_or_None).
     """
     txid, packet = _build_query(domain, qtype, use_edns0=True)
     data, err = _query_udp(server_ip, packet, timeout)
     if err:
-        return [], err, None
+        # Retry once on timeout — transient UDP packet loss
+        txid, packet = _build_query(domain, qtype, use_edns0=True)
+        data, err = _query_udp(server_ip, packet, timeout)
+        if err:
+            return [], err, None
 
     results, parse_err, tc_flag, min_ttl = _parse_response(data, txid, qtype)
 
